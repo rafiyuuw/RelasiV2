@@ -53,14 +53,14 @@ export default function LoginPage() {
     setSelectedDemoRole(role);
     setErrorMessage('');
     if (role === 'student') {
-      setEmail('siswa@sekolah.sch.id');
-      setPassword('demo1234');
+      setEmail('murid@gmail.com');
+      setPassword('murid123');
     } else if (role === 'counselor') {
-      setEmail('guru.bk@sekolah.sch.id');
-      setPassword('demo1234');
+      setEmail('guru@gmail.com');
+      setPassword('guru123');
     } else {
-      setEmail('admin@sekolah.sch.id');
-      setPassword('demo1234');
+      setEmail('admin@gmail.com');
+      setPassword('admin123');
     }
   };
 

@@ -410,7 +410,7 @@ export const Store = {
     });
   },
 
-  addMessageToReport(reportId: string, sender: 'student' | 'counselor', senderName: string, content: string): void {
+  addMessageToReport(reportId: string, sender: 'student' | 'counselor', senderName: string, content: string, photoUrl?: string): void {
     const reports = this.getReports();
     const updated = reports.map(r => {
       if (r.id === reportId) {
@@ -419,6 +419,7 @@ export const Store = {
           sender,
           senderName,
           content,
+          photoUrl,
           timestamp: new Date().toISOString(),
           isRead: sender === 'student' ? false : true,
         };
@@ -681,8 +682,8 @@ export const Store = {
     return this.addReport(newReport);
   },
 
-  addReportMessage(reportId: string, msg: { sender: 'student' | 'counselor'; senderName: string; content: string }): Report | undefined {
-    this.addMessageToReport(reportId, msg.sender, msg.senderName, msg.content);
+  addReportMessage(reportId: string, msg: { sender: 'student' | 'counselor'; senderName: string; content: string; photoUrl?: string }): Report | undefined {
+    this.addMessageToReport(reportId, msg.sender, msg.senderName, msg.content, msg.photoUrl);
     return this.getReportById(reportId);
   },
 

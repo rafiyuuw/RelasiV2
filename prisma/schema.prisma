@@ -1,0 +1,144 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  super_admin
+  counselor
+  student
+  guest
+}
+
+enum AccountStatus {
+  active
+  inactive
+}
+
+enum ReportStatus {
+  submitted
+  under_review
+  followup
+  resolved
+  dismissed
+}
+
+enum UrgencyLevel {
+  low
+  medium
+  urgent
+}
+
+model User {
+  id                String         @id @default(cuid())
+  name              String
+  email             String         @unique
+  password          String
+  role              Role           @default(student)
+  roleLabel         String?
+  departmentOrClass String?
+  status            AccountStatus  @default(active)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  reports           Report[]
+  auditLogs         AuditLog[]
+
+  @@map("users")
+}
+
+model Report {
+  id              String         @id
+  reporterId      String?
+  reporterName    String?
+  reporterEmail   String?
+  isAnonymous     Boolean        @default(false)
+  category        String
+  urgency         UrgencyLevel   @default(medium)
+  location        String
+  description     String
+  partiesInvolved String?
+  status          ReportStatus   @default(submitted)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  reporter        User?          @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+  caseRecord      CaseRecord?
+  messages        ChatMessage[]
+  triageAnalysis  TriageAnalysis?
+
+  @@map("reports")
+}
+
+model CaseRecord {
+  id              String       @id @default(cuid())
+  reportId        String       @unique
+  studentName     String
+  studentClass    String?
+  diagnosis       String
+  physicalInjury  String?
+  emotionalState  String?
+  counselorNotes  String?
+  actionTaken     String?
+  followUpPlan    String?
+  counselorInCharge String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  report          Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("case_records")
+}
+
+model ChatMessage {
+  id          String       @id @default(cuid())
+  reportId    String
+  sender      Role         @default(student)
+  senderName  String
+  content     String
+  photoUrl    String?
+  isRead      Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  report      Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model TriageAnalysis {
+  id              String       @id @default(cuid())
+  reportId        String       @unique
+  riskLevel       String
+  confidenceScore Float        @default(0.85)
+  keyFactors      String[]
+  recommendation  String
+  modelUsed       String       @default("nvidia/meta/llama-3.1-70b-instruct")
+  rawResponse     String?
+  createdAt       DateTime     @default(now())
+
+  report          Report       @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@map("triage_analyses")
+}
+
+model AuditLog {
+  id        String    @id @default(cuid())
+  actor     String
+  role      Role      @default(super_admin)
+  action    String
+  target    String
+  detail    String
+  userId    String?
+  createdAt DateTime  @default(now())
+
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}

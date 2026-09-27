@@ -205,71 +205,32 @@ Arsitektur produksi juga dirancang untuk mempertimbangkan:
 
 ---
 
-## 📋 Panduan untuk Rekan Kolaborator (Cara Menjalankan & Full Access)
+## 🛠️ Local Development
 
-Berikan instruksi di bawah ini kepada rekan Anda agar dapat langsung menjalankan aplikasi dan database PostgreSQL secara identik:
+### Requirements
+- Node.js
+- npm
 
-### 1. Clone / Pull Repository
+### Installation
+Clone repository:
 ```bash
 git clone https://github.com/rafiyuuw/RelasiV2.git
 cd RelasiV2
-# Atau jika sudah clone sebelumnya:
-git pull origin main
 ```
 
-### 2. Install Dependencies
+Install dependencies:
 ```bash
 npm install
 ```
 
-### 3. Konfigurasi Environment (`.env`)
-Salin file `.env.example` menjadi `.env`:
-```bash
-cp .env.example .env
-```
-Isi konfigurasi database PostgreSQL (misal via pgAdmin, Laragon, Docker, atau Supabase):
-```env
-# Sesuaikan user, password, host, port, dan nama database
-DATABASE_URL="postgresql://postgres:password_kamu@localhost:5432/relasi_db?schema=public"
-# (Opsional) NVIDIA AI Triage API Key
-NVIDIA_API_KEY="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"
-```
-
-### 4. Sinkronisasi Database & Seeding Data Awal
-Jalankan 2 perintah otomatis berikut untuk membuat tabel dan mengisi akun bawaan:
-```bash
-# Sinkronkan skema tabel ke PostgreSQL
-npm run db:push
-# Isi database dengan akun uji coba, rekam medis kasus & laporan contoh
-npm run db:seed
-```
-
-### 5. Jalankan Server Pengembangan
+Run development server:
 ```bash
 npm run dev
 ```
-Aplikasi akan aktif di `http://localhost:3000` (atau port `3001` sesuai konfigurasi lokal).
 
-*(Opsional) Jika ingin membuka GUI visual PostgreSQL:*
-```bash
-npm run db:studio
-# Aktif di http://localhost:5555
-```
+The application will be available through the local development server shown by Next.js.
 
----
-
-### 🔑 Akun Bawaan untuk Pengujian Full Access
-Semua akun berikut langsung dapat digunakan setelah menjalankan `npm run db:seed`:
-
-| Peran (Role) | Email | Password | Akses & Fitur Unggulan |
-| :--- | :--- | :--- | :--- |
-| **Super Admin** | `admin@gmail.com` | `admin123` | `/admin/super`: Manajemen akun DB, penonaktifan instan realtime tanpa reload, audit log aktivitas. |
-| **Guru BK** | `guru@gmail.com` | `guru123` | `/counselor`: Dashboard konseling, triage AI, realtime chat siswa per-laporan, kirim & lihat foto bukti. |
-| **Siswa / Pelapor** | `murid@gmail.com` | `murid123` | `/my-reports`: Histori laporan, realtime chat interaktif dengan guru BK, upload foto lampiran chat, badge notifikasi. |
-
----
-
-### 🛠️ Production Build
+### Production Build
 To verify the production build:
 ```bash
 npm run build

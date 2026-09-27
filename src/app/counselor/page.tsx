@@ -15,6 +15,12 @@ import {
   MessageSquare, 
   Send, 
   ArrowRight,
+  Sparkles,
+  Paperclip,
+  Image as ImageIcon,
+  Trash2,
+  Cpu,
+  CheckCircle2,
 } from 'lucide-react';
 import { RuangSuaraStore } from '@/lib/store';
 import { Report, ReportStatus } from '@/lib/types';
@@ -26,8 +32,13 @@ export default function CounselorDashboardPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'needs_review' | 'urgent' | 'anonymous'>('all');
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [counselorReply, setCounselorReply] = useState('');
+  const [counselorAttachment, setCounselorAttachment] = useState<string | null>(null);
+  const [counselorAttachmentName, setCounselorAttachmentName] = useState<string>('');
   const [isReplying, setIsReplying] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isAnalyzingTriage, setIsAnalyzingTriage] = useState(false);
+  const [triageData, setTriageData] = useState<any>(null);
+  const counselorFileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const loadData = () => {
     const list = RuangSuaraStore.getReports();
@@ -39,6 +50,10 @@ export default function CounselorDashboardPage() {
       if (refreshed) setSelectedReport(refreshed);
     }
   };
+
+  useEffect(() => {
+    setTriageData(null);
+  }, [selectedReport?.id]);
 
   useEffect(() => {
     loadData();
@@ -81,16 +96,63 @@ export default function CounselorDashboardPage() {
     loadData();
   };
 
+  const handleRunAITriage = async () => {
+    if (!selectedReport) return;
+    setIsAnalyzingTriage(true);
+    try {
+      const res = await fetch('/api/ai/triage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportId: selectedReport.id,
+          description: selectedReport.description,
+          category: selectedReport.category,
+          location: selectedReport.location,
+          partiesInvolved: selectedReport.partiesInvolved,
+          urgency: selectedReport.urgency,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.triage) {
+        setTriageData(data);
+        RuangSuaraStore.addAuditLog({
+          actor: currentUser.name || 'Guru BK',
+          role: 'counselor',
+          action: 'AI_TRIAGE_RUN',
+          target: selectedReport.id,
+          detail: `Menjalankan NVIDIA AI Triage untuk laporan ${selectedReport.id}: Status ${data.triage.riskLevel}`,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to run AI triage', err);
+    } finally {
+      setIsAnalyzingTriage(false);
+    }
+  };
+
+  const handleCounselorFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCounselorAttachmentName(file.name);
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      setCounselorAttachment(uploadEvent.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSendCounselorMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedReport || !counselorReply.trim()) return;
+    if (!selectedReport || (!counselorReply.trim() && !counselorAttachment)) return;
 
     setIsReplying(true);
     setTimeout(() => {
       RuangSuaraStore.addReportMessage(selectedReport.id, {
         sender: 'counselor',
         senderName: currentUser.name || 'Guru BK (Ibu Siti Rahmawati)',
-        content: counselorReply.trim(),
+        content: counselorReply.trim() || 'Lampiran foto bukti pendukung.',
+        photoUrl: counselorAttachment || undefined,
       });
 
       RuangSuaraStore.addAuditLog({
@@ -102,6 +164,8 @@ export default function CounselorDashboardPage() {
       });
 
       setCounselorReply('');
+      setCounselorAttachment(null);
+      setCounselorAttachmentName('');
       setIsReplying(false);
       loadData();
     }, 400);
@@ -412,6 +476,97 @@ export default function CounselorDashboardPage() {
                   </div>
                 </div>
 
+                {/* NVIDIA AI Triage Card */}
+                <div className="p-5 rounded-2xl border border-slate-800 bg-slate-950 text-white space-y-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center border border-red-500/30 shrink-0">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                          <span>NVIDIA AI Triage &amp; Assessment Kasus</span>
+                          <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            NIM Llama 3.1
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 font-normal">
+                          Deteksi risiko otomatis, dampak psikososial, dan relasi kuasa berstandar PPKSP
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRunAITriage}
+                      disabled={isAnalyzingTriage}
+                      className="px-4 py-2 rounded-xl !bg-[#E02B2B] hover:!bg-[#c92424] text-white text-xs font-medium transition flex items-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
+                    >
+                      {isAnalyzingTriage ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                          <span>Menganalisis Kasus...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Cpu className="w-3.5 h-3.5" />
+                          <span>{triageData ? 'Analisis Ulang AI' : 'Jalankan Triage AI'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {triageData?.triage && (
+                    <div className="pt-3 border-t border-slate-800 space-y-3 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">Tingkat Risiko:</span>
+                          <span className={`inline-flex items-center gap-1 font-bold ${
+                            triageData.triage.riskLevel === 'HIGH' ? 'text-red-400' : 'text-amber-400'
+                          }`}>
+                            <span className="w-2 h-2 rounded-full bg-current"></span>
+                            {triageData.triage.riskLabel || triageData.triage.riskLevel}
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">Skor Urgensi &amp; Akurasi:</span>
+                          <span className="font-semibold text-white">
+                            {triageData.triage.urgencyScore || 90}/100 • Keyakinan {Math.round((triageData.triage.confidenceScore || 0.9) * 100)}%
+                          </span>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block mb-0.5">Engine Penyedia:</span>
+                          <span className="text-slate-300 font-medium truncate block">
+                            {triageData.provider || 'NVIDIA NIM'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {triageData.triage.keyFactors && (
+                        <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
+                          <span className="text-[11px] font-semibold text-slate-300 block mb-1">Faktor Risiko Terdeteksi:</span>
+                          <ul className="list-disc list-inside space-y-0.5 text-slate-300 text-[11px]">
+                            {triageData.triage.keyFactors.map((f: string, idx: number) => (
+                              <li key={idx}>{f}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {triageData.triage.recommendedAction && (
+                        <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-200">
+                          <span className="text-[11px] font-semibold block mb-1 text-emerald-300">
+                            Rekomendasi Tindakan Segera Guru BK:
+                          </span>
+                          <p className="text-[11px] leading-relaxed font-normal">
+                            {triageData.triage.recommendedAction}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Aksi Case Dossier */}
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -437,12 +592,12 @@ export default function CounselorDashboardPage() {
                       <span>Komunikasi Tertutup dengan Siswa</span>
                     </h4>
                     <span className="text-[11px] text-slate-400 font-normal">
-                      Pesan dapat dibaca oleh siswa via kode PIN pelacakan
+                      Pesan dan foto bukti tersinkronisasi realtime
                     </span>
                   </div>
 
                   {/* Chat Messages */}
-                  <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 max-h-60 overflow-y-auto space-y-3">
+                  <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 max-h-64 overflow-y-auto space-y-3">
                     {selectedReport.messages.length === 0 ? (
                       <p className="text-center text-xs text-slate-400 font-normal py-6">
                         Belum ada riwayat percakapan. Kirimkan pesan klarifikasi atau jadwalkan sesi tatap muka tertutup.
@@ -463,27 +618,69 @@ export default function CounselorDashboardPage() {
                               ? 'bg-slate-900 text-white rounded-tr-xs' 
                               : 'bg-white border border-slate-200 text-slate-800 rounded-tl-xs'
                           }`}>
-                            {msg.content}
+                            <p>{msg.content}</p>
+                            {msg.photoUrl && (
+                              <div className="mt-2 rounded-xl overflow-hidden border border-slate-200/50 max-w-[220px] bg-slate-100">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img 
+                                  src={msg.photoUrl} 
+                                  alt="Bukti foto" 
+                                  className="w-full h-auto object-cover rounded-lg cursor-pointer hover:opacity-90 transition"
+                                  onClick={() => window.open(msg.photoUrl, '_blank')}
+                                />
+                                <span className="text-[10px] text-slate-400 block px-1 py-0.5">Bukti Foto (Klik perbesar)</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))
                     )}
                   </div>
 
+                  {/* Attachment Preview Chip */}
+                  {counselorAttachment && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-slate-800">
+                      <ImageIcon className="w-4 h-4 text-[#E02B2B] shrink-0" />
+                      <span className="truncate max-w-[240px] font-medium text-slate-700">{counselorAttachmentName || 'Foto Terlampir'}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setCounselorAttachment(null); setCounselorAttachmentName(''); }}
+                        className="text-red-500 hover:text-red-700 ml-auto p-1 cursor-pointer"
+                        title="Hapus lampiran"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
                   {/* Send Form */}
-                  <form onSubmit={handleSendCounselorMessage} className="flex gap-2">
+                  <form onSubmit={handleSendCounselorMessage} className="flex items-center gap-2">
+                    <input
+                      type="file"
+                      ref={counselorFileInputRef}
+                      onChange={handleCounselorFileChange}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => counselorFileInputRef.current?.click()}
+                      title="Kirim Foto Bukti / Panduan"
+                      className="p-2.5 rounded-xl border-2 border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 text-slate-600 transition cursor-pointer flex items-center justify-center shrink-0"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
                     <input
                       type="text"
-                      required
                       value={counselorReply}
                       onChange={(e) => setCounselorReply(e.target.value)}
-                      placeholder="Tulis pesan klarifikasi atau jadwal sesi konseling terlindungi..."
+                      placeholder="Tulis pesan klarifikasi, jadwal konseling, atau kirim bukti..."
                       className="flex-1 px-4 py-2.5 text-xs rounded-xl border-2 border-slate-300 focus:outline-none focus:border-[#E02B2B] bg-white font-normal shadow-2xs"
                     />
                     <button
                       type="submit"
-                      disabled={isReplying}
-                      className="px-6 py-2.5 rounded-xl !bg-[#E02B2B] hover:!bg-[#c92424] !text-white font-medium text-xs shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                      disabled={isReplying || (!counselorReply.trim() && !counselorAttachment)}
+                      className="px-6 py-2.5 rounded-xl !bg-[#E02B2B] hover:!bg-[#c92424] !text-white font-medium text-xs shadow-2xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60 shrink-0"
                     >
                       {isReplying ? (
                         <span>Mengirim...</span>

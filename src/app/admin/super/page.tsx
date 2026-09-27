@@ -32,9 +32,10 @@ export default function SuperAdminPage() {
 
   // Akun pengguna untuk manajemen tata kelola
   const [accounts, setAccounts] = useState([
-    { id: 'usr-bk-1', name: 'Ibu Siti Rahmawati, S.Psi., M.Pd.', role: 'Guru Bimbingan Konseling (BK)', email: 'siti.rahmawati@sekolah.sch.id', status: 'active' },
+    { id: 'usr-admin-1', name: 'Administrator Super Panel', role: 'Super Admin Sistem', email: 'admin@gmail.com', status: 'active' },
+    { id: 'usr-bk-1', name: 'Ibu Siti Rahmawati, S.Psi., M.Pd.', role: 'Guru Bimbingan Konseling (BK)', email: 'guru@gmail.com', status: 'active' },
     { id: 'usr-bk-2', name: 'Bpk. Ahmad Fauzi, S.Pd.', role: 'Anggota Satgas PPKSP / Guru BK', email: 'ahmad.fauzi@sekolah.sch.id', status: 'active' },
-    { id: 'usr-stu-1', name: 'Dimas Surya Pratama', role: 'Siswa (XI MIPA 2)', email: 'dimas.surya@sekolah.sch.id', status: 'active' },
+    { id: 'usr-stu-1', name: 'Dimas Surya Pratama', role: 'Siswa (XI MIPA 2)', email: 'murid@gmail.com', status: 'active' },
     { id: 'usr-stu-2', name: 'Larasati Putri Ayu', role: 'Siswa (X-E3)', email: 'larasati.putri@sekolah.sch.id', status: 'active' },
   ]);
 
@@ -43,6 +44,22 @@ export default function SuperAdminPage() {
   useEffect(() => {
     setAuditLogs(RuangSuaraStore.getAuditLogs());
     setEncryptedReports(RuangSuaraStore.getReportsForSuperAdmin());
+
+    // Sync from database API if available
+    fetch('/api/admin/users')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.users && data.users.length > 0) {
+          setAccounts(data.users.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            role: u.roleLabel || u.role,
+            email: u.email,
+            status: u.status,
+          })));
+        }
+      })
+      .catch(() => {});
 
     const readUrlTab = () => {
       if (typeof window === 'undefined') return;
@@ -58,21 +75,35 @@ export default function SuperAdminPage() {
     return () => window.removeEventListener('popstate', readUrlTab);
   }, []);
 
-  const handleToggleAccountStatus = (id: string) => {
+  const handleToggleAccountStatus = async (id: string) => {
+    let nextStatus = 'active';
     setAccounts(prev => prev.map(acc => {
       if (acc.id === id) {
-        const nextStatus = acc.status === 'active' ? 'inactive' : 'active';
+        nextStatus = acc.status === 'active' ? 'inactive' : 'active';
         RuangSuaraStore.addAuditLog({
           actor: currentUser.name || 'Super Admin',
           role: 'super_admin',
           action: 'TOGGLE_USER_STATUS',
           target: id,
-          detail: `Mengubah status akun ${acc.name} menjadi ${nextStatus}`,
+          detail: `Mengubah status akun ${acc.name} (${acc.email}) menjadi ${nextStatus}`,
         });
         return { ...acc, status: nextStatus };
       }
       return acc;
     }));
+
+    setAuditLogs(RuangSuaraStore.getAuditLogs());
+
+    // Realtime background database sync without page reload
+    try {
+      await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: nextStatus }),
+      });
+    } catch {
+      // Ignore background sync error
+    }
   };
 
   const handleSaveSettings = (e: React.FormEvent) => {

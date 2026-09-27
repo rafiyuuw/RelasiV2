@@ -18,7 +18,11 @@ import {
   AlertTriangle,
   FileText,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Paperclip,
+  Image as ImageIcon,
+  Trash2,
+  Bell
 } from 'lucide-react';
 import { useAuth } from '@/lib/authContext';
 import { RuangSuaraStore } from '@/lib/store';
@@ -30,7 +34,10 @@ export default function MyReportsPage() {
   const [filterTab, setFilterTab] = useState<'all' | 'active' | 'resolved'>('all');
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
   const [chatMessage, setChatMessage] = useState('');
+  const [attachmentPhoto, setAttachmentPhoto] = useState<string | null>(null);
+  const [attachmentName, setAttachmentName] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const loadReports = () => {
     const all = RuangSuaraStore.getReports();
@@ -40,7 +47,7 @@ export default function MyReportsPage() {
       r.id === 'RS-2026-0419' || 
       r.id === 'RS-2026-0412'
     );
-    setReports(myReports.length > 0 ? myReports : all.slice(0, 2));
+    setReports(myReports.length > 0 ? myReports : all.slice(0, 3));
   };
 
   useEffect(() => {
@@ -55,21 +62,36 @@ export default function MyReportsPage() {
     }
   }, [reports]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAttachmentName(file.name);
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      setAttachmentPhoto(uploadEvent.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedReport || !chatMessage.trim()) return;
+    if (!selectedReport || (!chatMessage.trim() && !attachmentPhoto)) return;
 
     setIsSending(true);
     setTimeout(() => {
       const updated = RuangSuaraStore.addReportMessage(selectedReport.id, {
         sender: 'student',
         senderName: selectedReport.isAnonymous ? 'Pelapor (Anonim)' : (selectedReport.reporterName || 'Siswa'),
-        content: chatMessage.trim(),
+        content: chatMessage.trim() || 'Lampiran foto bukti pengaduan.',
+        photoUrl: attachmentPhoto || undefined,
       });
 
       if (updated) {
         setSelectedReport(updated);
         setChatMessage('');
+        setAttachmentPhoto(null);
+        setAttachmentName('');
         loadReports();
       }
       setIsSending(false);
@@ -326,10 +348,17 @@ export default function MyReportsPage() {
                         <span>Enkripsi Berlapis</span>
                       </span>
                       <span>•</span>
-                      <span className="inline-flex items-center gap-1.5 text-slate-700 font-medium">
-                        <MessageSquare className="w-3.5 h-3.5 text-[#E02B2B]" />
-                        <span>{r.messages.length} Pesan dari Guru BK</span>
-                      </span>
+                      {r.messages.some(m => m.sender === 'counselor') ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-red-100 text-red-700 animate-pulse border border-red-200">
+                          <Bell className="w-3.5 h-3.5 text-red-600" />
+                          <span>Pesan Masuk dari Guru BK</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-slate-700 font-medium">
+                          <MessageSquare className="w-3.5 h-3.5 text-[#E02B2B]" />
+                          <span>{r.messages.length} Pesan</span>
+                        </span>
+                      )}
                     </div>
 
                     <button
@@ -437,6 +466,18 @@ export default function MyReportsPage() {
                             </span>
                           </div>
                           <p>{m.content}</p>
+                          {m.photoUrl && (
+                            <div className="mt-2 rounded-xl overflow-hidden border border-slate-200/60 max-w-[200px] bg-slate-100">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img 
+                                src={m.photoUrl} 
+                                alt="Lampiran bukti" 
+                                className="w-full h-auto object-cover rounded-lg cursor-pointer hover:opacity-90 transition"
+                                onClick={() => window.open(m.photoUrl, '_blank')}
+                              />
+                              <span className="text-[10px] text-slate-400 block px-1 py-0.5">Bukti Foto (Klik perbesar)</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))
@@ -448,20 +489,50 @@ export default function MyReportsPage() {
                   )}
                 </div>
 
+                {/* File Attachment Preview */}
+                {attachmentPhoto && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-xl text-xs text-slate-800">
+                    <ImageIcon className="w-4 h-4 text-[#E02B2B] shrink-0" />
+                    <span className="truncate max-w-[220px] font-medium text-slate-700">{attachmentName || 'Foto Terlampir'}</span>
+                    <button
+                      type="button"
+                      onClick={() => { setAttachmentPhoto(null); setAttachmentName(''); }}
+                      className="text-red-500 hover:text-red-700 ml-auto p-1 cursor-pointer"
+                      title="Hapus lampiran"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 {/* Input to send response to Counselor */}
-                <form onSubmit={handleSendMessage} className="flex gap-2">
+                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Upload Foto Bukti"
+                    className="p-2.5 rounded-xl border border-slate-300 hover:border-slate-400 bg-slate-50 hover:bg-slate-100 text-slate-600 transition cursor-pointer flex items-center justify-center shrink-0"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </button>
                   <input
                     type="text"
-                    required
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Tulis pesan atau keterangan tambahan ke Guru BK..."
+                    placeholder="Tulis pesan atau upload foto bukti ke Guru BK..."
                     className="flex-1 px-4 py-2.5 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-[#E02B2B]/20 focus:border-[#E02B2B] bg-white transition"
                   />
                   <button
                     type="submit"
-                    disabled={isSending || !chatMessage.trim()}
-                    className="px-4 py-2.5 rounded-xl !bg-[#E02B2B] hover:!bg-[#c92424] !text-white text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    disabled={isSending || (!chatMessage.trim() && !attachmentPhoto)}
+                    className="px-4 py-2.5 rounded-xl !bg-[#E02B2B] hover:!bg-[#c92424] !text-white text-xs font-medium transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
                   >
                     {isSending ? (
                       <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
